@@ -1,0 +1,39 @@
+{
+  "welcomeFile": "index.html",
+  "routes": [
+    {
+      "path": "/sap/opu/odata",
+      "target": {
+        "type": "destination",
+        "name": "GWD",
+        "entryPath": "/sap/opu/odata"
+      },
+      "description": "GWD"
+    },  	
+    {
+      "path": "/resources/com/pd/flp/ext",
+      "target": {
+        "type": "application",
+        "name": "ZFIoRI_LNCHPD_EXT"
+      }
+    },
+    {
+      "path": "/resources",
+      "target": {
+        "type": "service",
+        "name": "sapui5",
+        "entryPath": "/resources"
+      },
+      "description": "SAPUI5 Resources"
+    },
+    {
+      "path": "/test-resources",
+      "target": {
+        "type": "service",
+        "name": "sapui5",
+        "entryPath": "/test-resources"
+      },
+      "description": "SAPUI5 Test Resources"
+    }
+  ]
+}

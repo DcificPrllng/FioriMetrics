@@ -1,0 +1,9 @@
+{
+	"applications": {},
+	"bootstrapPlugins": {
+		"ZFIoRI_LNCHPD_EXT": {
+			"component": "com.pd.flp.ext",
+			"url": "../../../../../"
+		}
+	}
+}
