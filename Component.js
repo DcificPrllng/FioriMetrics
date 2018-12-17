@@ -3,41 +3,38 @@ sap.ui.define([
 	"sap/m/Button",
 	"sap/m/Bar",
 	"sap/m/MessageToast"
-], function(Component, Button, Bar, MessageToast) {
+], function (Component, Button, Bar, MessageToast) {
 
-	return Component.extend("com.pd.flp.ext.Component", {
+	return Component.extend("com.cis.ux.analytics.Component", {
 
 		metadata: {
 			"manifest": "json"
 		},
 
-		init: function() {
+		init: function () {
 
 			var appLifeCycle = sap.ushell.Container.getService("AppLifeCycle");
-			var currentApp = appLifeCycle.getCurrentApplication();
-			if (currentApp != undefined) { //This app is getting called directly using URL, without clicking on the Tile
-				if (!currentApp.homePage) {
-					var currentComponentID = currentApp.componentInstance.getId();
-					currentComponentID = currentComponentID.replace("application-", "");
-					currentComponentID = currentComponentID.replace("-component", "");
-					var currentHash = location.hash;
-					//Send details to server
-					this.getModel().create("/Actions", {
-						"ComponentID": currentComponentID,
-						"CompleteHash": currentHash
-					});
+			var oCurrentApplication = appLifeCycle.getCurrentApplication();
+			if (oCurrentApplication != undefined) { //This app is getting called directly using URL, without clicking on the Tile
+				if (!oCurrentApplication.homePage) {
+					this.logCurrentApplication(oCurrentApplication);
 				}
 			}
 
-			appLifeCycle.attachAppLoaded(null,
-				function(oData,
+			appLifeCycle.attachAppLoaded(null, //After cliking on a UI5 app, the app loads, and this event gets fired.
+				function (oData,
 					oEvent) {
-					currentApp = appLifeCycle.getCurrentApplication();
-					if (currentApp.homePage || location.hash === "#Shell-home") { //Navigated to FIori Launhcpad after directly opening a Fiori app using a bookmarked URL
+					oCurrentApplication = appLifeCycle.getCurrentApplication();
+					if (oCurrentApplication !== undefined) {
+						if (!oCurrentApplication.homePage) {
+							this.logCurrentApplication(oCurrentApplication);
+						}
+					}
+					if (oCurrentApplication.homePage || location.hash === "#Shell-home") { //Navigated to Fiori Launchpad after directly opening a Fiori app using a bookmarked URL
 						if (!this.hasOwnProperty("allGroups")) {
 							var that = this; //For passing the context using closure
 							var timeout = setInterval( //Wait for the Groups to load
-								function() {
+								function () {
 									if (sap.ui.getCore().byId("dashboardGroups").getGroups().length > 0) {
 										clearInterval(timeout);
 										var allGroups = sap.ui.getCore().byId("dashboardGroups").getGroups();
@@ -46,15 +43,19 @@ sap.ui.define([
 											var groupTiles = allGroups[i].getTiles();
 											for (var j = 0; j < groupTiles.length; j++) {
 												groupTiles[j].addEventDelegate({
-													ontap: function(evt) {
-														var appName = this.tile.getBindingContext().getObject().object.getTitle();
-														this.oModel.create("/Actions", {
-															"ApplicationName": appName
-														});
+													ontap: function (evt) {
+														//Handle only non-UI5 apps here
+														var appId = this.that.getNonUI5AppId(this);
+														if (appId) {
+															this.oModel.create("/Actions", {
+																"ApplicationName": appId
+															});
+														}
 													}
 												}, {
-													"oModel": that.getModel(),
-													"tile": groupTiles[j]
+													"oModel": this.getModel(),
+													"tile": groupTiles[j],
+													"that": this
 												});
 											}
 										}
@@ -64,25 +65,54 @@ sap.ui.define([
 					}
 				},
 				this);
-				
+
 			var allGroups = sap.ui.getCore().byId("dashboardGroups").getGroups();
 			this.allGroups = allGroups;
 			for (var i = 0; i < allGroups.length; i++) {
 				var groupTiles = allGroups[i].getTiles();
 				for (var j = 0; j < groupTiles.length; j++) {
 					groupTiles[j].addEventDelegate({
-						ontap: function(evt) {
-							var appName = this.tile.getBindingContext().getObject().object.getTitle();
-							this.oModel.create("/Actions", {
-								"ApplicationName": appName
-							});
+						ontap: function (evt) {
+							//Handle only non-UI5 apps here
+							var appId = this.that.getNonUI5AppId(this);
+							if (appId) {
+								this.oModel.create("/Actions", {
+									"ApplicationName": appId
+								});
+							}
 						}
 					}, {
 						"oModel": this.getModel(),
-						"tile": groupTiles[j]
+						"tile": groupTiles[j],
+						"that": this
 					});
 				}
 			}
+		},
+		getNonUI5AppId: function (context) {
+			//Check if the target does not start with #. SO it is definitely external
+			var sTargetNavigation = context.tile.getBindingInfo("target").binding.oContext.getObject().object.getImplementationAsSapui5().getController()
+				.navigationTargetUrl;
+			if (!sTargetNavigation.startsWith("#")) {
+				return context.tile.getBindingInfo("target").binding.oContext.getObject().originalTileId;
+			}
+
+			//Check if the target indicates that it is gui screen
+			if (sTargetNavigation.includes("sap-ui-tech-hint") || sTargetNavigation.includes("webgui") || sTargetNavigation.includes("personas")) {
+				return context.tile.getBindingInfo("target").binding.oContext.getObject().originalTileId;
+			}
+
+			//It is a UI5 Fiori App
+			return false;
+		},
+		logCurrentApplication: function (oCurrentApplication) {
+			var currentComponentID = oCurrentApplication.componentInstance.getMetadata().getComponentName();
+			var currentHash = location.hash;
+			//Send details to server
+			this.getModel().create("/Actions", {
+				"ApplicationID": currentComponentID,
+				"CompleteHash": currentHash
+			});
 		},
 		/**
 		 * Returns the shell renderer instance in a reliable way,
@@ -96,33 +126,33 @@ sap.ui.define([
 		 *      a jQuery promise, resolved with the renderer instance, or
 		 *      rejected with an error message.
 		 */
-		_getRenderer: function() {
-			var that = this,
-				oDeferred = new jQuery.Deferred(),
-				oRenderer;
+		// _getRenderer: function () {
+		// 	var that = this,
+		// 		oDeferred = new jQuery.Deferred(),
+		// 		oRenderer;
 
-			that._oShellContainer = jQuery.sap.getObject("sap.ushell.Container");
-			if (!that._oShellContainer) {
-				oDeferred.reject(
-					"Illegal state: shell container not available; this component must be executed in a unified shell runtime context.");
-			} else {
-				oRenderer = that._oShellContainer.getRenderer();
-				if (oRenderer) {
-					oDeferred.resolve(oRenderer);
-				} else {
-					// renderer not initialized yet, listen to rendererCreated event
-					that._onRendererCreated = function(oEvent) {
-						oRenderer = oEvent.getParameter("renderer");
-						if (oRenderer) {
-							oDeferred.resolve(oRenderer);
-						} else {
-							oDeferred.reject("Illegal state: shell renderer not available after recieving 'rendererLoaded' event.");
-						}
-					};
-					that._oShellContainer.attachRendererCreatedEvent(that._onRendererCreated);
-				}
-			}
-			return oDeferred.promise();
-		}
+		// 	that._oShellContainer = jQuery.sap.getObject("sap.ushell.Container");
+		// 	if (!that._oShellContainer) {
+		// 		oDeferred.reject(
+		// 			"Illegal state: shell container not available; this component must be executed in a unified shell runtime context.");
+		// 	} else {
+		// 		oRenderer = that._oShellContainer.getRenderer();
+		// 		if (oRenderer) {
+		// 			oDeferred.resolve(oRenderer);
+		// 		} else {
+		// 			// renderer not initialized yet, listen to rendererCreated event
+		// 			that._onRendererCreated = function (oEvent) {
+		// 				oRenderer = oEvent.getParameter("renderer");
+		// 				if (oRenderer) {
+		// 					oDeferred.resolve(oRenderer);
+		// 				} else {
+		// 					oDeferred.reject("Illegal state: shell renderer not available after recieving 'rendererLoaded' event.");
+		// 				}
+		// 			};
+		// 			that._oShellContainer.attachRendererCreatedEvent(that._onRendererCreated);
+		// 		}
+		// 	}
+		// 	return oDeferred.promise();
+		// }
 	});
 });

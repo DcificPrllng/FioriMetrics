@@ -1,2 +1,0 @@
-# FioriMetrics
-Fiori Metrics

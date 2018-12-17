@@ -10,7 +10,7 @@
 		"title": "{{plugin_title}}",
 		"dataSources": {
 			"mainService": {
-				"uri": "/sap/opu/odata/sap/ZFIORI_ANALYTICS_SRV",
+				"uri": "/sap/opu/odata/cis8fa1/UX_ANALYTICS_SRV",
 				"type": "OData",
 				"settings": {
 					"odataVersion": "2.0"
